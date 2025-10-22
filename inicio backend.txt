@@ -1,0 +1,11 @@
+C:\Users\rafam\Downloads\mongodb-windows-x86_64-6.0.26\mongodb-win32-x86_64-windows-6.0.26\bin
+
+abrir 2 terminales 
+
+en la 1 ingresar :
+
+".\mongod.exe" --dbpath "C:\data\db" --bind_ip 127.0.0.1 --port 27017
+
+en la 2 ingresar:
+
+netstat -aon | findstr 27017
