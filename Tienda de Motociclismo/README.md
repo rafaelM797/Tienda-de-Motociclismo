@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 
   # Tienda de Motociclismo
 
@@ -10,6 +9,3 @@
 
   Run `npm run dev` to start the development server.
   
-=======
-# Tienda-de-Motociclismo
->>>>>>> f7eef8e7a3ae3a70919a615a326e6bc14d064d85
