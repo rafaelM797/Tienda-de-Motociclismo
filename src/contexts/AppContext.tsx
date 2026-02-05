@@ -1,521 +1,235 @@
-import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import type { UserData } from '../components/AuthModal';
+import { createContext, useContext, useState, ReactNode, useEffect, Dispatch, SetStateAction } from 'react';
+import API_URL from '../apiConfig';
 
-export interface Address {
+export interface RegisteredUser {
   id: string;
-  name: string;
-  address: string;
-  city: string;
-  state: string;
-  zipCode: string;
-  isDefault: boolean;
-}
-
-export interface PaymentMethod {
-  id: string;
-  type: 'Tarjeta de Crédito' | 'Tarjeta de Débito' | 'PSE' | 'Nequi' | 'Daviplata';
-  name: string;
-  lastFour?: string;
-  expiryDate?: string;
-  isDefault: boolean;
-}
-
-export interface Order {
-  id: string;
-  userId: string;
-  date: string;
-  status: 'Procesando' | 'En tránsito' | 'Entregado' | 'Cancelado';
-  total: number;
-  items: {
-    name: string;
-    quantity: number;
-    price: number;
-  }[];
-  shipping: {
-    address: string;
-    city: string;
-    state: string;
-    zipCode: string;
-    method: string;
-    tracking?: string;
-  };
-  paymentMethod: string;
-  customerName: string;
-  customerEmail: string;
-  customerPhone: string;
-}
-
-export interface RegisteredUser extends UserData {
-  registeredDate: string;
-  totalOrders: number;
-  totalSpent: number;
-  status: 'Activo' | 'Inactivo';
-  addresses: Address[];
-  paymentMethods: PaymentMethod[];
-  password?: string;
+  _id?: string;
+  nombre?: string;
+  name?: string;
+  email: string;
+  telefono?: string;
+  phone?: string;
+  role?: 'user' | 'admin';
+  status?: string;
+  totalSpent?: number;
 }
 
 interface AppContextType {
   users: RegisteredUser[];
-  orders: Order[];
-  currentUser: UserData | null;
-  addUser: (user: UserData, password: string) => void;
-  addOrder: (order: Order) => void;
-  updateUser: (userId: string, updates: Partial<RegisteredUser>) => void;
-  updateOrder: (orderId: string, updates: Partial<Order>) => void;
-  getUserOrders: (userId: string) => Order[];
-  loginUser: (email: string, password: string) => UserData | null;
+  products: any[];
+  currentUser: RegisteredUser | null;
+  addUser: () => void;
+  loginUser: (user: RegisteredUser) => void;
   logoutUser: () => void;
-  addUserAddress: (userId: string, address: Omit<Address, 'id'>) => void;
-  updateUserAddress: (userId: string, addressId: string, updates: Partial<Address>) => void;
-  removeUserAddress: (userId: string, addressId: string) => void;
-  addUserPaymentMethod: (userId: string, paymentMethod: Omit<PaymentMethod, 'id'>) => void;
-  updateUserPaymentMethod: (userId: string, paymentMethodId: string, updates: Partial<PaymentMethod>) => void;
-  removeUserPaymentMethod: (userId: string, paymentMethodId: string) => void;
-  setCurrentUser: (user: UserData | null) => void;
+  setCurrentUser: Dispatch<SetStateAction<RegisteredUser | null>>;
+  updateUser: (userId: string, updates: any) => Promise<void>;
+  deleteUser: (userId: string) => Promise<void>;
+  updateProduct: (productId: string, updates: any) => Promise<void>;
+  deleteProduct: (productId: string) => Promise<void>;
+  refreshProducts: () => Promise<void>;
+  refreshUsers: () => Promise<void>;
+  getUserOrders: (userId: any) => any[];
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-// Datos mock iniciales
-const initialUsers: RegisteredUser[] = [
-  {
-    id: '1',
-    name: 'Carlos Rodríguez',
-    email: 'carlos.rodriguez@email.com',
-    phone: '+57 300 1234567',
-    registeredDate: '2024-01-15',
-    totalOrders: 12,
-    totalSpent: 1450000,
-    status: 'Activo',
-    password: 'password123',
-    addresses: [
-      {
-        id: 'addr1',
-        name: 'Casa',
-        address: 'Calle 45 #23-12',
-        city: 'Bogotá',
-        state: 'Cundinamarca',
-        zipCode: '110111',
-        isDefault: true
-      }
-    ],
-    paymentMethods: [
-      {
-        id: 'pm1',
-        type: 'Tarjeta de Crédito',
-        name: 'Visa **** 1234',
-        lastFour: '1234',
-        expiryDate: '12/25',
-        isDefault: true
-      }
-    ]
-  },
-  {
-    id: '2',
-    name: 'Ana María López',
-    email: 'ana.lopez@email.com',
-    phone: '+57 310 9876543',
-    registeredDate: '2024-02-20',
-    totalOrders: 8,
-    totalSpent: 980000,
-    status: 'Activo',
-    password: 'password123',
-    addresses: [
-      {
-        id: 'addr2',
-        name: 'Casa',
-        address: 'Carrera 15 #80-45',
-        city: 'Bogotá',
-        state: 'Cundinamarca',
-        zipCode: '110221',
-        isDefault: true
-      }
-    ],
-    paymentMethods: [
-      {
-        id: 'pm2',
-        type: 'PSE',
-        name: 'Bancolombia',
-        isDefault: true
-      }
-    ]
-  },
-  {
-    id: '3',
-    name: 'Juan Pablo Martínez',
-    email: 'juan.martinez@email.com',
-    phone: '+57 320 5551234',
-    registeredDate: '2024-03-10',
-    totalOrders: 15,
-    totalSpent: 2100000,
-    status: 'Activo',
-    password: 'password123',
-    addresses: [],
-    paymentMethods: []
-  },
-  {
-    id: '4',
-    name: 'María Fernanda Silva',
-    email: 'maria.silva@email.com',
-    phone: '+57 315 4445678',
-    registeredDate: '2024-04-05',
-    totalOrders: 5,
-    totalSpent: 650000,
-    status: 'Activo',
-    password: 'password123',
-    addresses: [],
-    paymentMethods: []
-  },
-  {
-    id: '5',
-    name: 'Diego Alejandro Gómez',
-    email: 'diego.gomez@email.com',
-    phone: '+57 318 7778899',
-    registeredDate: '2024-05-12',
-    totalOrders: 3,
-    totalSpent: 420000,
-    status: 'Inactivo',
-    password: 'password123',
-    addresses: [],
-    paymentMethods: []
-  }
-];
-
-const initialOrders: Order[] = [
-  {
-    id: 'ORD-2024-001',
-    userId: '1',
-    date: '2024-09-15',
-    status: 'Entregado',
-    total: 289980,
-    items: [
-      { name: 'Casco Integral Racing Pro', quantity: 1, price: 89990 },
-      { name: 'Chaqueta de Cuero Premium', quantity: 1, price: 159990 },
-      { name: 'Guantes Deportivos', quantity: 1, price: 29990 }
-    ],
-    shipping: {
-      address: 'Calle 45 #23-12',
-      city: 'Bogotá',
-      state: 'Cundinamarca',
-      zipCode: '110111',
-      method: 'Envío Express',
-      tracking: 'TRK123456789'
-    },
-    paymentMethod: 'Tarjeta de Crédito',
-    customerName: 'Carlos Rodríguez',
-    customerEmail: 'carlos.rodriguez@email.com',
-    customerPhone: '+57 300 1234567'
-  },
-  {
-    id: 'ORD-2024-002',
-    userId: '2',
-    date: '2024-09-18',
-    status: 'En tránsito',
-    total: 79990,
-    items: [
-      { name: 'Botas Touring Resistentes', quantity: 1, price: 79990 }
-    ],
-    shipping: {
-      address: 'Carrera 15 #80-45',
-      city: 'Bogotá',
-      state: 'Cundinamarca',
-      zipCode: '110221',
-      method: 'Envío Estándar',
-      tracking: 'TRK987654321'
-    },
-    paymentMethod: 'PSE',
-    customerName: 'Ana María López',
-    customerEmail: 'ana.lopez@email.com',
-    customerPhone: '+57 310 9876543'
-  }
-];
-
-// Funciones auxiliares para localStorage
-const saveToLocalStorage = (key: string, data: any) => {
-  try {
-    localStorage.setItem(key, JSON.stringify(data));
-  } catch (error) {
-    console.error('Error saving to localStorage:', error);
-  }
-};
-
-const loadFromLocalStorage = (key: string, defaultValue: any) => {
-  try {
-    const saved = localStorage.getItem(key);
-    return saved ? JSON.parse(saved) : defaultValue;
-  } catch (error) {
-    console.error('Error loading from localStorage:', error);
-    return defaultValue;
-  }
-};
-
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [users, setUsers] = useState<RegisteredUser[]>(() => 
-    loadFromLocalStorage('motogear_users', initialUsers)
-  );
-  const [orders, setOrders] = useState<Order[]>(() => 
-    loadFromLocalStorage('motogear_orders', initialOrders)
-  );
-  const [currentUser, setCurrentUserState] = useState<UserData | null>(() => 
-    loadFromLocalStorage('motogear_current_user', null)
-  );
+  const [users, setUsers] = useState<RegisteredUser[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [currentUser, setCurrentUser] = useState<RegisteredUser | null>(null);
 
-  // Guardar datos cuando cambien
+  // Cargar sesión desde localStorage al montar
   useEffect(() => {
-    saveToLocalStorage('motogear_users', users);
-  }, [users]);
+    const savedUser = localStorage.getItem('currentUser');
+    if (savedUser) {
+      try {
+        setCurrentUser(JSON.parse(savedUser));
+      } catch {
+        localStorage.removeItem('currentUser');
+      }
+    }
+    
+    // Cargar productos y usuarios al iniciar
+    refreshProducts();
+    refreshUsers();
+  }, []);
 
+  // Guardar usuario actual en localStorage cuando cambia
   useEffect(() => {
-    saveToLocalStorage('motogear_orders', orders);
-  }, [orders]);
-
-  useEffect(() => {
-    saveToLocalStorage('motogear_current_user', currentUser);
+    if (currentUser) {
+      localStorage.setItem('currentUser', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('currentUser');
+    }
   }, [currentUser]);
 
-  const addUser = (user: UserData, password: string) => {
-    const newUser: RegisteredUser = {
-      ...user,
-      registeredDate: new Date().toISOString().split('T')[0],
-      totalOrders: 0,
-      totalSpent: 0,
-      status: 'Activo',
-      password,
-      addresses: [],
-      paymentMethods: []
-    };
-    
-    setUsers(prev => {
-      const updated = [...prev, newUser];
-      // Guardar inmediatamente en localStorage para asegurar persistencia
-      try {
-        localStorage.setItem('motogear_users', JSON.stringify(updated));
-        console.log('Usuario registrado y guardado en localStorage:', newUser.email);
-      } catch (error) {
-        console.error('Error guardando usuario en localStorage:', error);
-      }
-      return updated;
-    });
-  };
-
-  const addOrder = (order: Order) => {
-    setOrders(prev => {
-      const updated = [...prev, order];
-      return updated;
-    });
-    
-    // Actualizar estadísticas del usuario
-    setUsers(prev => {
-      const updated = prev.map(user => {
-        if (user.id === order.userId) {
-          return {
-            ...user,
-            totalOrders: user.totalOrders + 1,
-            totalSpent: user.totalSpent + order.total
-          };
+  // Cargar productos desde el backend
+  const refreshProducts = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/productos`);
+      const data = await res.json();
+      const adaptados = (Array.isArray(data) ? data : []).map((p: any) => {
+        let imageUrl = '';
+        if (p.imagen) {
+          if (p.imagen.startsWith('http')) {
+            imageUrl = p.imagen;
+          } else if (p.imagen.startsWith('/')) {
+            imageUrl = `${API_URL}${p.imagen}`;
+          } else {
+            imageUrl = `${API_URL}/images/${encodeURIComponent(p.imagen)}`;
+          }
+        } else if (p.image) {
+          if (p.image.startsWith('http')) {
+            imageUrl = p.image;
+          } else if (p.image.startsWith('/')) {
+            imageUrl = `${API_URL}${p.image}`;
+          } else {
+            imageUrl = `${API_URL}/images/${encodeURIComponent(p.image)}`;
+          }
         }
-        return user;
+        return {
+          _id: p._id || p.id,
+          id: p._id || p.id,
+          name: p.nombre || p.name || '',
+          price: p.precio || p.price || 0,
+          originalPrice: p.precioOriginal || p.originalPrice || p.precio || p.price || 0,
+          image: imageUrl,
+          category: p.categoria || p.category || '',
+          rating: p.rating || 5,
+          inStock: (typeof p.stock === 'number' ? p.stock > 0 : true),
+          description: p.descripcion || p.description || '',
+          cost: p.costo || p.cost || 0,
+          sku: p.sku || '',
+          stock: p.stock || 0,
+          minStock: p.minStock || 0,
+          variants: p.variantes || p.variants || [],
+          createdAt: p.createdAt || '',
+        };
       });
-      return updated;
-    });
+      setProducts(adaptados);
+    } catch (err) {
+      console.error('Error cargando productos:', err);
+      setProducts([]);
+    }
   };
 
-  const updateUser = (userId: string, updates: Partial<RegisteredUser>) => {
-    setUsers(prev => {
-      const updated = prev.map(user => 
-        user.id === userId ? { ...user, ...updates } : user
-      );
-      return updated;
-    });
-    
-    // Si se está actualizando el usuario actual, actualizar también currentUser
-    if (currentUser && currentUser.id === userId) {
-      const updatedUser = users.find(u => u.id === userId);
-      if (updatedUser) {
-        setCurrentUserState({
-          id: updatedUser.id,
-          name: updatedUser.name,
-          email: updatedUser.email,
-          phone: updatedUser.phone
-        });
+  // Cargar usuarios desde el backend
+  const refreshUsers = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/usuarios`);
+      if (res.ok) {
+        const data = await res.json();
+        setUsers(Array.isArray(data) ? data : []);
       }
+    } catch (err) {
+      console.error('Error cargando usuarios:', err);
     }
   };
 
-  const updateOrder = (orderId: string, updates: Partial<Order>) => {
-    setOrders(prev => {
-      const updated = prev.map(order => 
-        order.id === orderId ? { ...order, ...updates } : order
-      );
-      return updated;
-    });
-  };
-
-  const getUserOrders = (userId: string) => {
-    return orders.filter(order => order.userId === userId);
-  };
-
-  const loginUser = (email: string, password: string): UserData | null => {
-    const user = users.find(u => u.email === email && u.password === password);
-    if (user) {
-      const userData: UserData = {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone
-      };
-      setCurrentUserState(userData);
-      return userData;
+  // Actualizar usuario en el backend
+  const updateUser = async (userId: string, updates: any) => {
+    try {
+      const res = await fetch(`${API_URL}/api/usuarios/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+      if (res.ok) {
+        const actualizado = await res.json();
+        setUsers(prev => prev.map(u => u.id === actualizado.id || u._id === actualizado._id ? actualizado : u));
+        // Si es el usuario actual, actualizar
+        if (currentUser && (currentUser.id === userId || currentUser._id === userId)) {
+          setCurrentUser({ ...currentUser, ...actualizado });
+        }
+      }
+    } catch (err) {
+      console.error('Error actualizando usuario:', err);
+      throw err;
     }
-    return null;
+  };
+
+  // Eliminar usuario del backend
+  const deleteUser = async (userId: string) => {
+    try {
+      const res = await fetch(`${API_URL}/api/usuarios/${userId}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setUsers(prev => prev.filter(u => u.id !== userId && u._id !== userId));
+      }
+    } catch (err) {
+      console.error('Error eliminando usuario:', err);
+      throw err;
+    }
+  };
+
+  // Actualizar producto en el backend
+  const updateProduct = async (productId: string, updates: any) => {
+    try {
+      const res = await fetch(`${API_URL}/api/productos/${productId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      });
+      if (res.ok) {
+        await refreshProducts(); // Recargar productos para sincronizar
+      }
+    } catch (err) {
+      console.error('Error actualizando producto:', err);
+      throw err;
+    }
+  };
+
+  // Eliminar producto del backend
+  const deleteProduct = async (productId: string) => {
+    try {
+      const res = await fetch(`${API_URL}/api/productos/${productId}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        setProducts(prev => prev.filter(p => p.id !== productId && p._id !== productId));
+      }
+    } catch (err) {
+      console.error('Error eliminando producto:', err);
+      throw err;
+    }
+  };
+
+  // Métodos de login/logout
+  const loginUser = (user: RegisteredUser) => {
+    setCurrentUser(user);
   };
 
   const logoutUser = () => {
-    setCurrentUserState(null);
+    setCurrentUser(null);
+    localStorage.removeItem('currentUser');
   };
 
-  const setCurrentUser = (user: UserData | null) => {
-    setCurrentUserState(user);
+  const addUser = () => {
+    refreshUsers();
   };
 
-  // Funciones para gestión de direcciones
-  const addUserAddress = (userId: string, address: Omit<Address, 'id'>) => {
-    const newAddress: Address = {
-      ...address,
-      id: Date.now().toString()
-    };
-    
-    setUsers(prev => {
-      const updated = prev.map(user => {
-        if (user.id === userId) {
-          const addresses = address.isDefault 
-            ? [newAddress, ...user.addresses.map(a => ({ ...a, isDefault: false }))]
-            : [...user.addresses, newAddress];
-          return { ...user, addresses };
-        }
-        return user;
-      });
-      return updated;
-    });
-  };
-
-  const updateUserAddress = (userId: string, addressId: string, updates: Partial<Address>) => {
-    setUsers(prev => {
-      const updated = prev.map(user => {
-        if (user.id === userId) {
-          let addresses = user.addresses.map(addr => 
-            addr.id === addressId ? { ...addr, ...updates } : addr
-          );
-          
-          // Si se está marcando como predeterminada, desmarcar las demás
-          if (updates.isDefault) {
-            addresses = addresses.map(addr => 
-              addr.id === addressId ? addr : { ...addr, isDefault: false }
-            );
-          }
-          
-          return { ...user, addresses };
-        }
-        return user;
-      });
-      return updated;
-    });
-  };
-
-  const removeUserAddress = (userId: string, addressId: string) => {
-    setUsers(prev => {
-      const updated = prev.map(user => {
-        if (user.id === userId) {
-          return {
-            ...user,
-            addresses: user.addresses.filter(addr => addr.id !== addressId)
-          };
-        }
-        return user;
-      });
-      return updated;
-    });
-  };
-
-  // Funciones para gestión de métodos de pago
-  const addUserPaymentMethod = (userId: string, paymentMethod: Omit<PaymentMethod, 'id'>) => {
-    const newPaymentMethod: PaymentMethod = {
-      ...paymentMethod,
-      id: Date.now().toString()
-    };
-    
-    setUsers(prev => {
-      const updated = prev.map(user => {
-        if (user.id === userId) {
-          const paymentMethods = paymentMethod.isDefault 
-            ? [newPaymentMethod, ...user.paymentMethods.map(pm => ({ ...pm, isDefault: false }))]
-            : [...user.paymentMethods, newPaymentMethod];
-          return { ...user, paymentMethods };
-        }
-        return user;
-      });
-      return updated;
-    });
-  };
-
-  const updateUserPaymentMethod = (userId: string, paymentMethodId: string, updates: Partial<PaymentMethod>) => {
-    setUsers(prev => {
-      const updated = prev.map(user => {
-        if (user.id === userId) {
-          let paymentMethods = user.paymentMethods.map(pm => 
-            pm.id === paymentMethodId ? { ...pm, ...updates } : pm
-          );
-          
-          // Si se está marcando como predeterminado, desmarcar los demás
-          if (updates.isDefault) {
-            paymentMethods = paymentMethods.map(pm => 
-              pm.id === paymentMethodId ? pm : { ...pm, isDefault: false }
-            );
-          }
-          
-          return { ...user, paymentMethods };
-        }
-        return user;
-      });
-      return updated;
-    });
-  };
-
-  const removeUserPaymentMethod = (userId: string, paymentMethodId: string) => {
-    setUsers(prev => {
-      const updated = prev.map(user => {
-        if (user.id === userId) {
-          return {
-            ...user,
-            paymentMethods: user.paymentMethods.filter(pm => pm.id !== paymentMethodId)
-          };
-        }
-        return user;
-      });
-      return updated;
-    });
+  // Mock: función para obtener pedidos de usuario
+  const getUserOrders = (userId: any) => {
+    return [];
   };
 
   return (
     <AppContext.Provider value={{
       users,
-      orders,
+      products,
       currentUser,
       addUser,
-      addOrder,
-      updateUser,
-      updateOrder,
-      getUserOrders,
       loginUser,
       logoutUser,
-      addUserAddress,
-      updateUserAddress,
-      removeUserAddress,
-      addUserPaymentMethod,
-      updateUserPaymentMethod,
-      removeUserPaymentMethod,
-      setCurrentUser
+      setCurrentUser,
+      updateUser,
+      deleteUser,
+      updateProduct,
+      deleteProduct,
+      refreshProducts,
+      refreshUsers,
+      getUserOrders
     }}>
       {children}
     </AppContext.Provider>

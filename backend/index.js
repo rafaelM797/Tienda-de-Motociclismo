@@ -12,17 +12,27 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
 import productsRouter from './routes/products.js';
 import authRouter from './routes/auth.js';
+import usersRouter from './routes/users.js';
+import cartRouter from './routes/cart.js';
+import categoriasRouter from './routes/categorias.js';
 
 
 app.use(cors());
 app.use(express.json());
+
 app.use('/api/productos', productsRouter);
 app.use('/api/auth', authRouter);
+app.use('/api/usuarios', usersRouter);
+app.use('/api/carrito', cartRouter);
+app.use('/api/categorias', categoriasRouter);
 
 // Servir archivos estáticos de la carpeta public/images
 app.use('/images', express.static(path.resolve(__dirname, '..', 'public', 'images')));
+// Si no existen en public, servir también desde dist/images (útil en builds anteriores)
+app.use('/images', express.static(path.resolve(__dirname, '..', 'dist', 'images')));
 
 // Opciones modernas y tiempos para diagnosticar mejor problemas de conexión
 const mongooseOptions = {

@@ -4,7 +4,8 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Lock, User, Shield } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import API_URL from '../apiConfig';
 
 interface AdminLoginModalProps {
   isOpen: boolean;
@@ -17,29 +18,46 @@ export function AdminLoginModal({ isOpen, onClose, onLoginSuccess }: AdminLoginM
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!username || !password) {
       toast.error('Por favor completa todos los campos');
       return;
     }
-
     setIsLoading(true);
-    
-    // Simular delay de autenticación
-    setTimeout(() => {
-      // Validar credenciales
-      if (username === 'Administrador' && password === 'Admin123') {
-        toast.success('¡Acceso concedido!');
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // timeout 10s
+      
+      const res = await fetch(`${API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: username, password }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'Credenciales incorrectas. Acceso denegado.');
+      } else if (data.usuario && data.usuario.role === 'admin') {
+        toast.success('¡Bienvenido Administrador! Acceso concedido al panel de gestión.');
         onLoginSuccess();
         onClose();
         resetForm();
       } else {
-        toast.error('Credenciales incorrectas. Acceso denegado.');
+        toast.error('No tienes permisos de administrador.');
       }
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        toast.error('Timeout: El servidor tardó demasiado en responder');
+      } else {
+        toast.error('Error de conexión con el servidor');
+      }
+      console.error('Error en login admin:', err);
+    } finally {
       setIsLoading(false);
-    }, 800);
+    }
   };
 
   const resetForm = () => {
@@ -63,21 +81,21 @@ export function AdminLoginModal({ isOpen, onClose, onLoginSuccess }: AdminLoginM
               <Shield className="h-8 w-8 text-red-600" />
             </div>
           </div>
-          <DialogTitle className="text-center">Acceso Administrativo</DialogTitle>
-          <DialogDescription className="text-center">
-            Ingresa tus credenciales de administrador para acceder al panel de gestión
+          <DialogTitle className="text-center text-red-700 font-bold">Acceso Administrativo</DialogTitle>
+          <DialogDescription className="text-center text-red-500">
+            <strong>Solo administradores autorizados.</strong> Ingresa tus credenciales para acceder al panel de gestión exclusivo.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           <div className="space-y-2">
-            <Label htmlFor="username">Usuario</Label>
+            <Label htmlFor="username">Correo electrónico</Label>
             <div className="relative">
               <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 id="username"
                 type="text"
-                placeholder="Ingresa tu usuario"
+                placeholder="Ingresa tu correo electrónico"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="pl-10"

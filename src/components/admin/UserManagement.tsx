@@ -12,54 +12,62 @@ import { toast } from 'sonner@2.0.3';
 import { Label } from '../ui/label';
 import { useAppContext, type RegisteredUser } from '../../contexts/AppContext';
 
-const statusColors = {
-  'Activo': 'bg-green-100 text-green-800',
-  'Inactivo': 'bg-gray-100 text-gray-800'
+const roleColors = {
+  'admin': 'bg-red-100 text-red-800',
+  'user': 'bg-blue-100 text-blue-800'
 };
 
 export function UserManagement() {
-  const { users, updateUser } = useAppContext();
+  const { users, updateUser, deleteUser } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [roleFilter, setRoleFilter] = useState<string>('all');
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<RegisteredUser | null>(null);
+  const [userToDelete, setUserToDelete] = useState<RegisteredUser | null>(null);
 
   const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const userName = user.nombre || user.name || '';
+    const matchesSearch = userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
-    return matchesSearch && matchesStatus;
+                         (user.id || user._id || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesRole = roleFilter === 'all' || user.role === roleFilter;
+    return matchesSearch && matchesRole;
   });
-
-  const updateUserStatus = (userId: string, newStatus: 'Activo' | 'Inactivo') => {
-    updateUser(userId, { status: newStatus });
-    toast.success(`Estado del usuario actualizado a ${newStatus}`);
-  };
 
   const saveUserChanges = () => {
     if (!editingUser) return;
     
-    updateUser(editingUser.id, {
-      name: editingUser.name,
+    const userId = editingUser.id || editingUser._id || '';
+    updateUser(userId, {
+      nombre: editingUser.nombre || editingUser.name,
       email: editingUser.email,
-      phone: editingUser.phone,
-      status: editingUser.status
+      telefono: editingUser.telefono || editingUser.phone,
+      role: editingUser.role
+    }).then(() => {
+      setIsEditDialogOpen(false);
+      setEditingUser(null);
+      toast.success('Usuario actualizado correctamente');
+    }).catch(() => {
+      toast.error('Error al actualizar usuario');
     });
-    setIsEditDialogOpen(false);
-    setEditingUser(null);
-    toast.success('Usuario actualizado correctamente');
   };
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      minimumFractionDigits: 0
-    }).format(price);
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
+    try {
+      const userId = userToDelete.id || userToDelete._id || '';
+      await deleteUser(userId);
+      setIsDeleteDialogOpen(false);
+      setUserToDelete(null);
+      toast.success('Usuario eliminado correctamente');
+    } catch {
+      toast.error('Error al eliminar usuario');
+    }
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return 'N/A';
     const date = new Date(dateString);
     return date.toLocaleDateString('es-ES', {
       year: 'numeric',
@@ -67,6 +75,9 @@ export function UserManagement() {
       day: 'numeric'
     });
   };
+
+  const adminCount = users.filter(u => u.role === 'admin').length;
+  const userCount = users.filter(u => u.role === 'user').length;
 
   return (
     <div className="space-y-6">
@@ -83,20 +94,20 @@ export function UserManagement() {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-gray-600">
-              Usuarios Activos
+              Administradores
             </CardTitle>
-            <div className="text-2xl font-bold text-green-600">
-              {users.filter(u => u.status === 'Activo').length}
+            <div className="text-2xl font-bold text-red-600">
+              {adminCount}
             </div>
           </CardHeader>
         </Card>
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-gray-600">
-              Ventas Totales
+              Usuarios Regulares
             </CardTitle>
             <div className="text-2xl font-bold text-blue-600">
-              {formatPrice(users.reduce((sum, u) => sum + u.totalSpent, 0))}
+              {userCount}
             </div>
           </CardHeader>
         </Card>
@@ -126,15 +137,15 @@ export function UserManagement() {
                 />
               </div>
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
               <SelectTrigger className="w-full sm:w-48">
                 <Filter className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Estado" />
+                <SelectValue placeholder="Rol" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos los estados</SelectItem>
-                <SelectItem value="Activo">Activo</SelectItem>
-                <SelectItem value="Inactivo">Inactivo</SelectItem>
+                <SelectItem value="all">Todos los roles</SelectItem>
+                <SelectItem value="admin">Administrador</SelectItem>
+                <SelectItem value="user">Usuario</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -146,74 +157,86 @@ export function UserManagement() {
                 <TableRow>
                   <TableHead>Usuario</TableHead>
                   <TableHead>Teléfono</TableHead>
-                  <TableHead>Estado</TableHead>
+                  <TableHead>Rol</TableHead>
                   <TableHead>Fecha Registro</TableHead>
-                  <TableHead>Pedidos</TableHead>
-                  <TableHead>Total Gastado</TableHead>
                   <TableHead>Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredUsers.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{user.name}</div>
-                        <div className="text-sm text-gray-500">{user.email}</div>
-                        <div className="text-xs text-gray-400">ID: {user.id}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-1 text-sm">
-                        <Phone className="h-3 w-3 text-gray-400" />
-                        <span>{user.phone}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={statusColors[user.status]}>
-                        {user.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{formatDate(user.registeredDate)}</TableCell>
-                    <TableCell>{user.totalOrders}</TableCell>
-                    <TableCell>{formatPrice(user.totalSpent)}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setEditingUser(user);
-                            setIsEditDialogOpen(true);
-                          }}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Select
-                          value={user.status}
-                          onValueChange={(value) => updateUserStatus(user.id, value as 'Activo' | 'Inactivo')}
-                        >
-                          <SelectTrigger className="w-28">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Activo">Activo</SelectItem>
-                            <SelectItem value="Inactivo">Inactivo</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                {filteredUsers.length > 0 ? (
+                  filteredUsers.map((user) => (
+                    <TableRow key={user.id || user._id}>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{user.nombre || user.name || 'N/A'}</div>
+                          <div className="text-sm text-gray-500">{user.email}</div>
+                          <div className="text-xs text-gray-400">ID: {user.id || user._id}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-1 text-sm">
+                          <Phone className="h-3 w-3 text-gray-400" />
+                          <span>{user.telefono || user.phone || 'N/A'}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={roleColors[user.role || 'user'] || 'bg-gray-100 text-gray-800'}>
+                          {user.role === 'admin' ? 'Administrador' : 'Usuario'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{formatDate(user.fechaRegistro)}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setEditingUser({...user});
+                              setIsEditDialogOpen(true);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <AlertDialog open={isDeleteDialogOpen && userToDelete?.id === user.id} onOpenChange={setIsDeleteDialogOpen}>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setUserToDelete(user)}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Eliminar usuario</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  ¿Estás seguro de que quieres eliminar a {user.nombre || user.name}? Esta acción no se puede deshacer.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleDeleteUser} className="bg-red-600 hover:bg-red-700">
+                                  Eliminar
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-gray-500">
+                      No se encontraron usuarios
                     </TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
           </div>
-          
-          {filteredUsers.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              No se encontraron usuarios
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -232,8 +255,8 @@ export function UserManagement() {
                 <Label htmlFor="name">Nombre</Label>
                 <Input
                   id="name"
-                  value={editingUser.name}
-                  onChange={(e) => setEditingUser({...editingUser, name: e.target.value})}
+                  value={editingUser.nombre || editingUser.name || ''}
+                  onChange={(e) => setEditingUser({...editingUser, nombre: e.target.value, name: e.target.value})}
                 />
               </div>
               <div>
@@ -250,22 +273,22 @@ export function UserManagement() {
                 <Input
                   id="phone"
                   type="tel"
-                  value={editingUser.phone}
-                  onChange={(e) => setEditingUser({...editingUser, phone: e.target.value})}
+                  value={editingUser.telefono || editingUser.phone || ''}
+                  onChange={(e) => setEditingUser({...editingUser, telefono: e.target.value, phone: e.target.value})}
                 />
               </div>
               <div>
-                <Label htmlFor="status">Estado</Label>
+                <Label htmlFor="role">Rol</Label>
                 <Select
-                  value={editingUser.status}
-                  onValueChange={(value) => setEditingUser({...editingUser, status: value as 'Activo' | 'Inactivo'})}
+                  value={editingUser.role || 'user'}
+                  onValueChange={(value) => setEditingUser({...editingUser, role: value as 'user' | 'admin'})}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Activo">Activo</SelectItem>
-                    <SelectItem value="Inactivo">Inactivo</SelectItem>
+                    <SelectItem value="user">Usuario</SelectItem>
+                    <SelectItem value="admin">Administrador</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

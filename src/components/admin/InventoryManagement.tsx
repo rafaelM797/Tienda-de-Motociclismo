@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useAppContext } from '../../contexts/AppContext';
+import API_URL from '../../apiConfig';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -10,10 +12,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Plus, Edit, Trash2, Package, AlertTriangle, CheckCircle, Search, Filter } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 
 interface Product {
-  id: number;
+  _id?: string;
+  id?: number;
   name: string;
   description: string;
   category: string;
@@ -24,7 +27,7 @@ interface Product {
   minStock: number;
   variants: ProductVariant[];
   image: string;
-  status: 'active' | 'inactive';
+  // status: 'active' | 'inactive';
   createdAt: string;
 }
 
@@ -37,139 +40,48 @@ interface ProductVariant {
 }
 
 interface Category {
-  id: number;
-  name: string;
-  description: string;
-  productCount: number;
-  status: 'active' | 'inactive';
+  _id?: string;
+  id?: string | number;
+  nombre?: string;
+  name?: string;
+  descripcion?: string;
+  description?: string;
+  createdAt?: string;
 }
 
-// Mock data
-const mockProducts: Product[] = [
-  {
-    id: 1,
-    name: 'Casco Integral Racing Pro',
-    description: 'Casco integral de alta gama para motociclismo deportivo',
-    category: 'Cascos',
-    price: 89990,
-    cost: 45000,
-    sku: 'CAS-RCG-001',
-    stock: 15,
-    minStock: 5,
-    variants: [
-      { id: 1, name: 'Talla', value: 'S', stock: 3 },
-      { id: 2, name: 'Talla', value: 'M', stock: 8 },
-      { id: 3, name: 'Talla', value: 'L', stock: 4 },
-      { id: 4, name: 'Color', value: 'Negro', stock: 10 },
-      { id: 5, name: 'Color', value: 'Rojo', stock: 5 }
-    ],
-    image: 'https://images.unsplash.com/photo-1673526154034-1749d70dd472?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3RvcmN5Y2xlJTIwaGVsbWV0JTIwcmFjaW5nfGVufDF8fHx8MTc1OTM0MDIzNHww&ixlib=rb-4.1.0&q=80&w=1080',
-    status: 'active',
-    createdAt: '2024-01-15'
-  },
-  {
-    id: 2,
-    name: 'Chaqueta de Cuero Premium',
-    description: 'Chaqueta de cuero genuino con protecciones',
-    category: 'Chaquetas',
-    price: 159990,
-    cost: 80000,
-    sku: 'CHQ-CUE-002',
-    stock: 3,
-    minStock: 5,
-    variants: [
-      { id: 6, name: 'Talla', value: 'M', stock: 1 },
-      { id: 7, name: 'Talla', value: 'L', stock: 2 },
-      { id: 8, name: 'Color', value: 'Negro', stock: 3 }
-    ],
-    image: 'https://images.unsplash.com/photo-1654720498638-46c8d93bc32d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3RvcmN5Y2xlJTIwbGVhdGhlciUyMGphY2tldHxlbnwxfHx8fDE3NTkyNjcyMDV8MA&ixlib=rb-4.1.0&q=80&w=1080',
-    status: 'active',
-    createdAt: '2024-01-10'
-  },
-  {
-    id: 3,
-    name: 'Botas Touring Resistentes',
-    description: 'Botas impermeables para touring de larga distancia',
-    category: 'Botas',
-    price: 79990,
-    cost: 40000,
-    sku: 'BOT-TUR-003',
-    stock: 8,
-    minStock: 3,
-    variants: [
-      { id: 9, name: 'Talla', value: '40', stock: 2 },
-      { id: 10, name: 'Talla', value: '42', stock: 3 },
-      { id: 11, name: 'Talla', value: '44', stock: 3 }
-    ],
-    image: 'https://images.unsplash.com/photo-1758621516645-637a426889c5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3RvcmN5Y2xlJTIwYm9vdHMlMjBnZWFyfGVufDF8fHx8MTc1OTM0MDIzNXww&ixlib=rb-4.1.0&q=80&w=1080',
-    status: 'active',
-    createdAt: '2024-01-08'
-  },
-  {
-    id: 4,
-    name: 'Guantes Deportivos',
-    description: 'Guantes con protecciones de nudillos y palma reforzada',
-    category: 'Accesorios',
-    price: 29990,
-    cost: 15000,
-    sku: 'GUA-DEP-004',
-    stock: 2,
-    minStock: 5,
-    variants: [
-      { id: 12, name: 'Talla', value: 'S', stock: 0 },
-      { id: 13, name: 'Talla', value: 'M', stock: 1 },
-      { id: 14, name: 'Talla', value: 'L', stock: 1 }
-    ],
-    image: 'https://images.unsplash.com/photo-1719535218083-bd6f9c860229?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3RvcmN5Y2xlJTIwZ2xvdmVzJTIwYWNjZXNzb3JpZXN8ZW58MXx8fHwxNTkzNDAyMzZ8MA&ixlib=rb-4.1.0&q=80&w=1080',
-    status: 'active',
-    createdAt: '2024-01-05'
-  },
-  {
-    id: 5,
-    name: 'Kit de Herramientas Básico',
-    description: 'Kit completo de herramientas para mantenimiento básico',
-    category: 'Accesorios',
-    price: 49990,
-    cost: 25000,
-    sku: 'KIT-HER-005',
-    stock: 12,
-    minStock: 8,
-    variants: [],
-    image: 'https://images.unsplash.com/photo-1636761358757-0a616eb9e17e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3RvcmN5Y2xlJTIwdG9vbHMlMjB3b3Jrc2hvcHxlbnwxfHx8fDE3NTkzNDM5MTh8MA&ixlib=rb-4.1.0&q=80&w=1080',
-    status: 'active',
-    createdAt: '2024-01-03'
-  },
-  {
-    id: 6,
-    name: 'Casco Modular Adventure',
-    description: 'Casco modular para aventura con visera solar',
-    category: 'Cascos',
-    price: 129990,
-    cost: 65000,
-    sku: 'CAS-ADV-006',
-    stock: 0,
-    minStock: 3,
-    variants: [
-      { id: 15, name: 'Talla', value: 'M', stock: 0 },
-      { id: 16, name: 'Talla', value: 'L', stock: 0 }
-    ],
-    image: 'https://images.unsplash.com/photo-1673526154034-1749d70dd472?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb3RvcmN5Y2xlJTIwaGVsbWV0JTIwcmFjaW5nfGVufDF8fHx8MTc1OTM0MDIzNHww&ixlib=rb-4.1.0&q=80&w=1080',
-    status: 'inactive',
-    createdAt: '2023-12-20'
-  }
-];
-
-const mockCategories: Category[] = [
-  { id: 1, name: 'Cascos', description: 'Cascos para motociclismo', productCount: 2, status: 'active' },
-  { id: 2, name: 'Chaquetas', description: 'Chaquetas y protecciones', productCount: 1, status: 'active' },
-  { id: 3, name: 'Botas', description: 'Calzado para motociclismo', productCount: 1, status: 'active' },
-  { id: 4, name: 'Accesorios', description: 'Guantes y accesorios varios', productCount: 2, status: 'active' },
-  { id: 5, name: 'Repuestos', description: 'Repuestos y herramientas', productCount: 0, status: 'inactive' }
-];
-
 export function InventoryManagement() {
-  const [products, setProducts] = useState<Product[]>(mockProducts);
-  const [categories, setCategories] = useState<Category[]>(mockCategories);
+  // Usar productos del contexto global
+  const { products } = useAppContext() as { products: any[] };
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { currentUser } = useAppContext();
+  // Ajusta el tipo de currentUser para que tenga 'role', si no existe, revisa la definición de UserData
+  const isAdmin = (currentUser as any)?.role === 'admin';
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+        try {
+          const [prodRes, catRes] = await Promise.all([
+            fetch(`${API_URL}/api/productos`),
+            fetch(`${API_URL}/api/categorias`)
+          ]);
+          if (!prodRes.ok) throw new Error('Error al cargar productos');
+          if (!catRes.ok) throw new Error('Error al cargar categorías');
+          const productos = await prodRes.json();
+          const categorias = await catRes.json();
+          // productos ya se actualizan por el contexto
+          setCategories(categorias);
+        } catch (err: any) {
+          setError(err.message || 'Error desconocido');
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchData();
+    }, []);
   const [activeTab, setActiveTab] = useState('products');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -189,65 +101,138 @@ export function InventoryManagement() {
   // Productos con stock bajo
   const lowStockProducts = products.filter(product => product.stock <= product.minStock);
 
-  const handleSaveProduct = (productData: Partial<Product>) => {
+  const handleSaveProduct = async (productData: Partial<Product>) => {
     if (selectedProduct) {
-      // Editar producto existente
-      setProducts(prev => prev.map(p => 
-        p.id === selectedProduct.id 
-          ? { ...p, ...productData }
-          : p
-      ));
-      toast.success('Producto actualizado correctamente');
+      // Editar producto existente en el backend
+      try {
+        const res = await fetch(`${API_URL}/api/productos/${selectedProduct._id || selectedProduct.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(productData)
+        });
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          console.error('Error al actualizar producto:', errorData);
+          throw new Error(errorData.error || 'Error al actualizar producto');
+        }
+        const actualizado = await res.json();
+        toast.success('Producto actualizado correctamente');
+        setIsProductDialogOpen(false);
+        setSelectedProduct(null);
+      } catch (err: any) {
+        toast.error(err.message || 'Error al actualizar producto');
+      }
     } else {
-      // Crear nuevo producto
-      const newProduct: Product = {
-        id: Date.now(),
-        ...productData as Product,
-        createdAt: new Date().toISOString().split('T')[0]
-      };
-      setProducts(prev => [...prev, newProduct]);
-      toast.success('Producto creado correctamente');
+      // Crear nuevo producto en el backend
+      try {
+        // Adaptar los campos al modelo del backend
+        const backendProduct = {
+          nombre: productData.name,
+          descripcion: productData.description,
+          precio: productData.price,
+          categoria: productData.category,
+          imagen: productData.image,
+          enOferta: false
+        };
+        const res = await fetch(`${API_URL}/api/productos`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(backendProduct)
+        });
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          console.error('Error al crear producto:', errorData);
+          throw new Error(errorData.error || 'Error al crear producto');
+        }
+        const nuevo = await res.json();
+        toast.success('Producto creado correctamente');
+        setIsProductDialogOpen(false);
+        setSelectedProduct(null);
+      } catch (err: any) {
+        toast.error(err.message || 'Error al crear producto');
+      }
     }
-    setIsProductDialogOpen(false);
-    setSelectedProduct(null);
   };
 
-  const handleDeleteProduct = (productId: number) => {
-    setProducts(prev => prev.filter(p => p.id !== productId));
-    toast.success('Producto eliminado correctamente');
+  const handleDeleteProduct = async (productId: string) => {
+    try {
+      const res = await fetch(`${API_URL}/api/productos/${productId}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) throw new Error('Error al eliminar producto');
+  // productos ya se actualizan por el contexto
+      toast.success('Producto eliminado correctamente');
+    } catch (err: any) {
+      toast.error(err.message || 'Error al eliminar producto');
+    }
   };
 
-  const handleSaveCategory = (categoryData: Partial<Category>) => {
+  const handleSaveCategory = async (categoryData: Partial<Category>) => {
     if (selectedCategoryEdit) {
-      // Editar categoría existente
-      setCategories(prev => prev.map(c => 
-        c.id === selectedCategoryEdit.id 
-          ? { ...c, ...categoryData }
-          : c
-      ));
-      toast.success('Categoría actualizada correctamente');
+      // Editar categoría existente en el backend
+      try {
+        const categoryId = selectedCategoryEdit._id || selectedCategoryEdit.id;
+        const res = await fetch(`${API_URL}/api/categorias/${categoryId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nombre: categoryData.nombre || categoryData.name,
+            descripcion: categoryData.descripcion || categoryData.description
+          })
+        });
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          console.error('Error al actualizar categoría:', errorData);
+          throw new Error(errorData.error || 'Error al actualizar categoría');
+        }
+        const actualizada = await res.json();
+        setCategories(prev => prev.map(c => 
+          (c._id === actualizada._id || c.id === actualizada.id) ? actualizada : c
+        ));
+        toast.success('Categoría actualizada correctamente');
+      } catch (err: any) {
+        toast.error(err.message || 'Error al actualizar categoría');
+        return;
+      }
     } else {
-      // Crear nueva categoría
-      const newCategory: Category = {
-        id: Date.now(),
-        productCount: 0,
-        ...categoryData as Category
-      };
-      setCategories(prev => [...prev, newCategory]);
-      toast.success('Categoría creada correctamente');
+      // Crear nueva categoría en el backend
+      try {
+        const res = await fetch(`${API_URL}/api/categorias`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nombre: categoryData.nombre || categoryData.name,
+            descripcion: categoryData.descripcion || categoryData.description
+          })
+        });
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          console.error('Error al crear categoría:', errorData);
+          throw new Error(errorData.error || 'Error al crear categoría');
+        }
+        const nueva = await res.json();
+        setCategories(prev => [...prev, nueva]);
+        toast.success('Categoría creada correctamente');
+      } catch (err: any) {
+        toast.error(err.message || 'Error al crear categoría');
+        return;
+      }
     }
     setIsCategoryDialogOpen(false);
     setSelectedCategoryEdit(null);
   };
 
-  const handleDeleteCategory = (categoryId: number) => {
-    const category = categories.find(c => c.id === categoryId);
-    if (category && category.productCount > 0) {
-      toast.error('No se puede eliminar una categoría con productos asociados');
-      return;
+  const handleDeleteCategory = async (categoryId: string | number) => {
+    try {
+      const res = await fetch(`${API_URL}/api/categorias/${categoryId}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) throw new Error('Error al eliminar categoría');
+      setCategories(prev => prev.filter(c => c.id !== categoryId && c._id !== categoryId));
+      toast.success('Categoría eliminada correctamente');
+    } catch (err: any) {
+      toast.error(err.message || 'Error al eliminar categoría');
     }
-    setCategories(prev => prev.filter(c => c.id !== categoryId));
-    toast.success('Categoría eliminada correctamente');
   };
 
   return (
@@ -288,7 +273,7 @@ export function InventoryManagement() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas las categorías</SelectItem>
-                  {categories.filter(c => c.status === 'active').map(category => (
+                  {categories.map(category => (
                     <SelectItem key={category.id} value={category.name}>
                       {category.name}
                     </SelectItem>
@@ -308,7 +293,7 @@ export function InventoryManagement() {
               </DialogTrigger>
               <ProductDialog 
                 product={selectedProduct}
-                categories={categories.filter(c => c.status === 'active')}
+                categories={categories}
                 onSave={handleSaveProduct}
               />
             </Dialog>
@@ -317,13 +302,13 @@ export function InventoryManagement() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredProducts.map((product) => (
               <ProductCard
-                key={product.id}
+                key={product._id || product.id}
                 product={product}
                 onEdit={(product) => {
                   setSelectedProduct(product);
                   setIsProductDialogOpen(true);
                 }}
-                onDelete={handleDeleteProduct}
+                onDelete={(id) => handleDeleteProduct(String(product._id ?? product.id))}
               />
             ))}
           </div>
@@ -416,7 +401,7 @@ export function InventoryManagement() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {categories.filter(c => c.status === 'active').map((category) => {
+                {categories.map((category) => {
                   const categoryProducts = products.filter(p => p.category === category.name);
                   const totalStock = categoryProducts.reduce((sum, p) => sum + p.stock, 0);
                   const lowStockCount = categoryProducts.filter(p => p.stock <= p.minStock).length;
@@ -527,7 +512,7 @@ function ProductCard({ product, onEdit, onDelete }: {
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => onDelete(product.id)}>
+                  <AlertDialogAction onClick={() => onDelete(Number(product.id))}>
                     Eliminar
                   </AlertDialogAction>
                 </AlertDialogFooter>
@@ -540,9 +525,7 @@ function ProductCard({ product, onEdit, onDelete }: {
           <h3 className="font-medium text-gray-900 line-clamp-2">{product.name}</h3>
           <p className="text-sm text-gray-500">SKU: {product.sku}</p>
           <div className="flex items-center justify-between">
-            <Badge variant={product.status === 'active' ? 'default' : 'secondary'}>
-              {product.status === 'active' ? 'Activo' : 'Inactivo'}
-            </Badge>
+            {/* Aquí podrías mostrar información adicional del producto si tu modelo real la tiene */}
             <Badge variant={isLowStock ? 'destructive' : 'secondary'}>
               Stock: {product.stock}
             </Badge>
@@ -576,15 +559,15 @@ function ProductCard({ product, onEdit, onDelete }: {
 function CategoryCard({ category, onEdit, onDelete }: {
   category: Category;
   onEdit: (category: Category) => void;
-  onDelete: (id: number) => void;
+  onDelete: (id: string | number) => void;
 }) {
   return (
     <Card className="hover:shadow-lg transition-shadow">
       <CardContent className="p-4">
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1">
-            <h3 className="font-medium text-gray-900">{category.name}</h3>
-            <p className="text-sm text-gray-500 mt-1">{category.description}</p>
+            <h3 className="font-medium text-gray-900">{category.nombre || category.name}</h3>
+            <p className="text-sm text-gray-500 mt-1">{category.descripcion || category.description}</p>
           </div>
           <div className="flex space-x-1">
             <Button
@@ -600,7 +583,7 @@ function CategoryCard({ category, onEdit, onDelete }: {
                   variant="ghost" 
                   size="sm" 
                   className="text-red-600 hover:text-red-700"
-                  disabled={category.productCount > 0}
+                  // Si tu modelo real tiene lógica para deshabilitar, agrégala aquí
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -614,7 +597,7 @@ function CategoryCard({ category, onEdit, onDelete }: {
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => onDelete(category.id)}>
+                  <AlertDialogAction onClick={() => onDelete(category._id || category.id)}>
                     Eliminar
                   </AlertDialogAction>
                 </AlertDialogFooter>
@@ -625,12 +608,8 @@ function CategoryCard({ category, onEdit, onDelete }: {
         
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Badge variant={category.status === 'active' ? 'default' : 'secondary'}>
-              {category.status === 'active' ? 'Activa' : 'Inactiva'}
-            </Badge>
-            <span className="text-sm text-gray-500">
-              {category.productCount} productos
-            </span>
+            {/* Aquí podrías mostrar información adicional de la categoría si tu modelo real la tiene */}
+            {/* Aquí podrías mostrar información adicional si tu modelo real la tiene */}
           </div>
         </div>
       </CardContent>
@@ -654,7 +633,6 @@ function ProductDialog({ product, categories, onSave }: {
     stock: 0,
     minStock: 0,
     image: '',
-    status: 'active',
     variants: []
   });
 
@@ -673,7 +651,6 @@ function ProductDialog({ product, categories, onSave }: {
         stock: 0,
         minStock: 0,
         image: '',
-        status: 'active',
         variants: []
       });
     }
@@ -734,7 +711,7 @@ function ProductDialog({ product, categories, onSave }: {
             <Label htmlFor="category">Categoría *</Label>
             <Select 
               value={formData.category} 
-              onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+              onValueChange={(value: string) => setFormData(prev => ({ ...prev, category: value }))}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Seleccionar categoría" />
@@ -748,21 +725,7 @@ function ProductDialog({ product, categories, onSave }: {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="status">Estado</Label>
-            <Select 
-              value={formData.status} 
-              onValueChange={(value: 'active' | 'inactive') => setFormData(prev => ({ ...prev, status: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active">Activo</SelectItem>
-                <SelectItem value="inactive">Inactivo</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Si tu modelo real tiene estado, agrégalo aquí */}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -837,27 +800,29 @@ function CategoryDialog({ category, onSave }: {
   onSave: (category: Partial<Category>) => void;
 }) {
   const [formData, setFormData] = useState<Partial<Category>>({
-    name: '',
-    description: '',
-    status: 'active'
+    nombre: '',
+    descripcion: ''
   });
 
   // Inicializar formulario cuando se abre
   useEffect(() => {
     if (category) {
-      setFormData(category);
+      setFormData({
+        nombre: category.nombre || category.name || '',
+        descripcion: category.descripcion || category.description || ''
+      });
     } else {
       setFormData({
-        name: '',
-        description: '',
-        status: 'active'
+        nombre: '',
+        descripcion: ''
       });
     }
   }, [category]);
 
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name) {
+    if (!formData.nombre) {
       toast.error('Por favor ingresa el nombre de la categoría');
       return;
     }
@@ -872,23 +837,24 @@ function CategoryDialog({ category, onSave }: {
         </DialogTitle>
       </DialogHeader>
       
+
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="name">Nombre *</Label>
+          <Label htmlFor="nombre">Nombre *</Label>
           <Input
-            id="name"
-            value={formData.name}
-            onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+            id="nombre"
+            value={formData.nombre}
+            onChange={(e) => setFormData(prev => ({ ...prev, nombre: e.target.value }))}
             placeholder="Nombre de la categoría"
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="description">Descripción</Label>
+          <Label htmlFor="descripcion">Descripción</Label>
           <Textarea
-            id="description"
-            value={formData.description}
-            onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+            id="descripcion"
+            value={formData.descripcion}
+            onChange={(e) => setFormData(prev => ({ ...prev, descripcion: e.target.value }))}
             placeholder="Descripción de la categoría"
             rows={3}
           />
@@ -897,8 +863,8 @@ function CategoryDialog({ category, onSave }: {
         <div className="space-y-2">
           <Label htmlFor="status">Estado</Label>
           <Select 
-            value={formData.status} 
-            onValueChange={(value: 'active' | 'inactive') => setFormData(prev => ({ ...prev, status: value }))}
+            // value={formData.status}
+            // onValueChange={(value: 'active' | 'inactive') => setFormData(prev => ({ ...prev, status: value }))}
           >
             <SelectTrigger>
               <SelectValue />

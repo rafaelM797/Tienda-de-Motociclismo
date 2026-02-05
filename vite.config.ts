@@ -51,12 +51,15 @@
     },
     build: {
       target: 'es2017', // Mejor compatibilidad con navegadores
-      outDir: 'build',
+      outDir: 'dist',
       minify: 'esbuild', // Minificación rápida y eficiente
       sourcemap: false,  // Desactiva mapas de fuente en producción
     },
     server: {
       port: 3000,
       open: true,
+      proxy: {
+        '/api': 'http://localhost:4000'
+      }
     },
   });
