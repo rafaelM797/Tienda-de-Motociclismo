@@ -17,6 +17,7 @@ import { getUserFavorites, toggleFavorite } from './apiFavoritos';
 import { ImageWithFallback } from './components/figma/ImageWithFallback';
 import { toast } from 'sonner';
 import API_URL from './apiConfig';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 interface CartItem extends Product {
   quantity: number;
@@ -391,6 +392,7 @@ function AppContent() {
           onLogout={handleLogout}
         />
       )}
+      <SpeedInsights />
     </div>
   );
 }
