@@ -17,6 +17,7 @@ import { getUserFavorites, toggleFavorite } from './apiFavoritos';
 import { ImageWithFallback } from './components/figma/ImageWithFallback';
 import { toast } from 'sonner';
 import API_URL from './apiConfig';
+import { Analytics } from '@vercel/analytics/react';
 
 interface CartItem extends Product {
   quantity: number;
@@ -399,6 +400,7 @@ export default function App() {
   return (
     <AppProvider>
       <AppContent />
+      <Analytics />
     </AppProvider>
   );
 }
